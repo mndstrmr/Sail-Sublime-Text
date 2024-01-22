@@ -1,0 +1,249 @@
+%YAML 1.2
+---
+name: Sail
+file_extensions: [sail]
+scope: source.sail
+variables:
+  id: '[A-Za-z_][A-Za-z_0-9]*'
+
+contexts:
+  main:
+    - include: comments
+    - include: union_clause
+    - include: function_clause
+    - include: mapping_clause
+    - include: mapping_stmt
+    - include: type_stmt
+    - include: top_level_let
+    - include: struct
+    - include: function
+    - include: val
+    - include: enum
+
+  top_level_escape:
+    - match: "(?=enum\\b|function\\b|union\\b|mapping\\b|type\\b|struct\\s+{{id}}\\s*\\{)"
+      pop: true
+
+  top_level_let:
+    - match: "\\b(let)\\b"
+      captures:
+        1: keyword.declaration.sail
+        2: variable.other.readwrite.sail
+      push: [expr, let_pattern]
+
+  val:
+    - match: "\\b(val)\\s+({{id}})\\s*:"
+      captures:
+        1: keyword.declaration.sail
+        2: variable.other.readwrite.sail
+      push: [type_expr]
+
+  enum:
+    - match: "\\b(enum)\\s+({{id}}) = \\{"
+      captures:
+        1: keyword.declaration.enum.sail
+        2: entity.name.enum.sail
+      set: [enum_meta, enum_fields]
+  enum_fields:
+    - match: "({{id}})"
+      captures:
+        1: variable.other.member
+    - match: "\\}"
+      pop: true
+  enum_meta:
+    - meta_scope: meta.enum.sail
+    - match: ''
+      pop: true
+
+  struct:
+    - match: "\\b(struct)\\s+({{id}}) = \\{"
+      captures:
+        1: keyword.declaration.struct.sail
+        2: entity.name.struct.sail
+      set: [struct_meta, struct_fields]
+  struct_fields:
+    - match: "({{id}})\\s*:"
+      captures:
+        1: variable.other.member
+    - match: "\\}"
+      pop: true
+    - include: type_expr
+  struct_meta:
+    - meta_scope: meta.struct.sail
+    - match: ''
+      pop: true
+
+  type_stmt:
+    - match: "\\b(type)\\s+({{id}})\\s*:"
+      captures:
+        1: keyword.declaration.type.sail
+        2: entity.name.type.sail
+      set: [type_meta, type_expr, type_eq, type_expr]
+    - match: "\\b(type)\\s+({{id}})\\s*="
+      captures:
+        1: keyword.declaration.type.sail
+        2: entity.name.type.sail
+      set: [type_meta, type_expr]
+  type_eq:
+    - match: "="
+      pop: true
+  type_meta:
+    - meta_scope: meta.type.sail
+    - match: ''
+      pop: true
+
+  mapping_clause:
+    - match: "\\b(mapping\\s+clause)\\s+({{id}})\\s*="
+      captures:
+        1: keyword.declaration.function.sail
+        2: entity.name.function.sail
+      set: [mapping_meta, expr]
+  mapping_meta:
+    - meta_scope: meta.function.sail
+    - match: ''
+      pop: true
+
+  union_clause:
+    - match: "\\b(union\\s+clause)\\s+({{id}})\\s*=\\s*({{id}})\\s*:"
+      captures:
+        1: keyword.declaration.union.sail
+        2: entity.name.union.sail
+        3: variable.other.member.sail
+      set: [union_meta, type_expr]
+  union_meta:
+    - meta_scope: meta.union.sail
+    - match: ''
+      pop: true
+
+  function:
+    - match: "\\b(function)\\s+({{id}})\\s*\\("
+      captures:
+        1: keyword.declaration.function.sail
+        2: entity.name.function.sail
+      set: [function_meta, expr, function_eq, function_params]
+  function_params:
+    - meta_scope: meta.function.paramaters.sail
+    - match: "({{id}})\\s*:"
+      captures:
+        1: variable.parameter
+    - match: "({{id}})\\s*(,|(?=\\)))"
+      captures:
+        1: variable.parameter
+    - match: "\\)\\s*:"
+      set: type_expr
+    - match: "\\)\\s*="
+      pop: 2
+    - include: type_expr
+  function_clause:
+    - match: "\\b(function\\s+clause)\\s+({{id}})"
+      captures:
+        1: keyword.declaration.function.sail
+        2: entity.name.function.sail
+      set: [function_meta, expr, function_eq, pattern]
+  function_eq:
+    - match: "="
+      pop: true
+  function_meta:
+    - meta_scope: meta.function.sail
+    - match: ''
+      pop: true
+
+  comments:
+    - match: /\*!
+      push:
+        - meta_scope: comment.block.documentation.sail
+        - match: \*/
+          pop: true
+    - match: /\*
+      push:
+        - meta_scope: comment.block.sail
+        - match: \*/
+          pop: true
+    - match: //.*
+      scope: comment.line.sail
+
+  string:
+    - meta_scope: string.quoted.double.sail
+    - match: \\.
+      scope: constant.character.escape.sail
+    - match: '"'
+      pop: true
+
+  pattern:
+    - include: top_level_escape
+    - match: "(?==|:)"
+      pop: true
+    - match: "({{id}})\\s*\\("
+    - match: "{{id}}"
+      scope: variable.other.readwrite.sail
+
+  type_expr:
+    - include: let_stmt
+    - match: "(?==)"
+      pop: true
+    - include: top_level_escape
+    - include: literal
+    - match: "({{id}})\\s*\\("
+      captures:
+        1: variable.function.sail
+    - match: "{{id}}"
+      scope: storage.type.sail
+    - include: expr
+
+  let_stmt:
+    - match: "\\b(let)\\b"
+      captures:
+        1: keyword.declaration.sail
+      push: [expr, let_pattern]
+    - match: "\\b(var)\\b"
+      captures:
+        1: keyword.declaration.sail
+      push: [expr, let_pattern]
+  let_pattern:
+    - match: ":\\s*({{id}})"
+      captures:
+        1: storage.type.sail
+    - match: "{{id}}"
+      scope: variable.other.readwrite.sail
+    - match: "="
+      pop: true
+    - include: literal
+
+  literal:
+    - match: \b(true|false|assert|not)\b
+      scope: constant.language.sail
+    - match: \b(bits|bool)\b
+      scope: storage.type.sail
+    - match: \b(struct)\b
+      scope: keyword.declaration.struct.sail
+    - match: \b(sizeof|unsigned|signed|EXTZ|EXTS|with)\b
+      scope: keyword.operator.sail
+    - match: \b0x[0-9a-fA-F]+\b
+      scope: constant.numeric.integer.hexadecimal.sail
+    - match: \b[0-9]+\b
+      scope: constant.numeric.integer.decimal.sail
+    - match: \b0b[01]+\b
+      scope: constant.numeric.integer.binary.sail
+    - match: '"'
+      push: string
+
+  expr:
+    - match: (?=/\*!)
+      pop: true
+    - include: top_level_escape
+    - include: literal
+    - include: comments
+    - include: ws
+    - match: \b(if|then|else|for|while|match|return|in)\b
+      scope: keyword.control.sail
+    - include: let_stmt
+    - match: "({{id}})\\s*\\("
+      captures:
+        1: variable.function.sail
+    - match: "{{id}}"
+      scope: variable.other.readwrite.sail
+    - match: \{
+    - match: \}
+    # - match: "=>"
+    - match: "(=>|<->|\\+|-|\\*|/|<<|>>|>>>|@|&|~|\\\\|==|!=|->|<=(_[us])?|>=(_[us])?|<(_[us])?|>(_[us])?|\\.\\.|\\^|=|%)"
+      scope: keyword.operator.sail
